@@ -1,36 +1,29 @@
-/**
- * Middleware Setup
- * Registers Express middleware
- */
+import { Express, Request } from 'express';
+import express from 'express';
+import { securityHeadersMiddleware } from '../middlewares/securityHeaders';
+import { requestLoggerMiddleware } from '../middlewares/requestLogger';
+import { requestContextMiddleware } from '../middlewares/requestContext';
+import { httpLoggingMiddleware } from '../middlewares/httpLogging';
 
-import express, { Express } from 'express';
-import helmet from 'helmet';
-import getLogger from '../utils/loggerHelper';
+interface RequestWithRawBody extends Request {
+  rawBody?: string;
+}
 
-const logger = getLogger(module);
-
-/**
- * Register all middleware
- */
 export function registerMiddleware(app: Express): void {
-  logger.info('[Middleware] Registering middleware');
+  app.set('trust proxy', true);
 
-  // Security headers
-  app.use(helmet());
+  app.use(requestContextMiddleware);
+  app.use(securityHeadersMiddleware);
 
-  // Body parsing
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  app.use(express.json({ 
+    limit: '1mb',
+    verify: (req: Request, res, buf, encoding) => {
+      (req as RequestWithRawBody).rawBody = buf.toString((encoding as BufferEncoding) || 'utf8');
+    }
+  }));
 
-  // Request logging (simple)
-  app.use((req, _res, next) => {
-    logger.debug('[Request] Incoming request', {
-      method: req.method,
-      path: req.path,
-      ip: req.ip,
-    });
-    next();
-  });
+  app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
-  logger.info('[Middleware] Middleware registered successfully');
+  app.use(httpLoggingMiddleware);
+  app.use(requestLoggerMiddleware);
 }

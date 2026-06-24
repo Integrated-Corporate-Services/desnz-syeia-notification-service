@@ -1,76 +1,76 @@
-/**
- * HTTP Server Entry Point
- * Starts the Express server and handles graceful shutdown
- */
-
+// Server Startup
+import express, { Express } from 'express';
 import { createApp } from './app';
+import getLogger from './utils/loggerHelper';
 import { createPool, closePool } from './database/db';
 import config from './config/config';
-import getLogger from './utils/loggerHelper';
 
 const logger = getLogger(module);
 
-// Create database pool
-const pool = createPool();
-
-// Create Express app
-const app = createApp(pool);
-
-// Start HTTP server
-const server = app.listen(config.port, () => {
-  logger.info('[Server] Server started', {
-    port: config.port,
-    host: config.host,
-    env: config.nodeEnv,
-  });
-});
+const PORT = config.port;
+const HOST = config.host || '0.0.0.0';
+const SHUTDOWN_TIMEOUT_MS = 30000; // 30 seconds
 
 /**
  * Graceful shutdown handler
+ * Coordinates HTTP server and database pool closure
  */
-async function shutdown(signal: string): Promise<void> {
-  logger.info(`[Server] ${signal} received, starting graceful shutdown`);
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`[SERVER] ${signal} received, shutting down gracefully`);
 
-  // Close HTTP server
-  server.close(() => {
-    logger.info('[Server] HTTP server closed');
-  });
-
-  // Wait for server to close with timeout
+  // Set shutdown timeout
   const shutdownTimeout = setTimeout(() => {
-    logger.error('[Server] Forced shutdown after timeout');
+    logger.error('[SERVER] Forced shutdown after timeout');
     process.exit(1);
-  }, 10000); // 10 seconds
+  }, SHUTDOWN_TIMEOUT_MS);
 
   try {
-    // Close database pool
+    // Step 1: Stop accepting new connections
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        logger.info('[SERVER] HTTP server closed - no new connections accepted');
+        resolve();
+      });
+    });
+
+    // Step 2: Close database pool (waits for active queries to complete)
     await closePool();
 
+    // Step 3: Cleanup complete
     clearTimeout(shutdownTimeout);
-    logger.info('[Server] Graceful shutdown complete');
+    logger.info('[SERVER] Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
-    logger.error('[Server] Error during shutdown', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    clearTimeout(shutdownTimeout);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('[SERVER] Error during shutdown', { error: errorMessage });
     process.exit(1);
   }
 }
 
-// Shutdown signals
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+let server: ReturnType<Express['listen']>;
 
-// Uncaught exceptions and unhandled rejections
-process.on('uncaughtException', (error) => {
-  logger.error('[Server] Uncaught exception', {
-    error: error.message,
-    stack: error.stack,
+(async () => {
+  // Initialize database pool
+  createPool();
+  
+  const app: Express = await createApp();
+
+  server = app.listen(PORT, HOST, () => {
+    logger.info('[SERVER] Notify Callback Service started', {
+      host: HOST,
+      port: PORT,
+      env: process.env.NODE_ENV,
+    });
+    logger.info('[SERVER] Health check available at', {
+      url: `http://${HOST}:${PORT}/health`,
+    });
+    logger.info('[SERVER] Callback endpoint available at', {
+      url: `http://${HOST}:${PORT}/callbacks/notify/delivery`,
+    });
   });
-  shutdown('uncaughtException');
-});
 
-process.on('unhandledRejection', (reason) => {
-  logger.error('[Server] Unhandled rejection', { reason });
-  shutdown('unhandledRejection');
-});
+  // Graceful shutdown handlers
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+})();

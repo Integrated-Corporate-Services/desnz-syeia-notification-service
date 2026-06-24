@@ -1,31 +1,25 @@
-/**
- * Notify Callback Routes
- * Route definitions for GOV.UK Notify callbacks
- */
+// Notify Callback Routes
+import express from 'express';
+const router = express.Router();
+const { handleDeliveryCallback, healthCheck } = require('../controllers/notifyCallbackController');
+const { validateNotifyBearerTokenMiddleware } = require('../middlewares/validateNotifyBearerToken');
+const {
+  validateNotifyCallbackPayloadMiddleware,
+} = require('../validators/notifyCallbackPayloadValidator');
 
-import express, { Router } from 'express';
-import type { Pool } from 'pg';
-import { validateNotifyBearerTokenMiddleware } from '../middlewares/validateNotifyBearerToken';
-import { validateNotifyCallbackPayloadMiddleware } from '../validators/notifyCallbackPayloadValidator';
-import { handleDeliveryCallback, healthCheck } from '../controllers/notifyCallbackController';
+// Health check endpoint
+router.get('/health', healthCheck);
 
-export function createNotifyCallbackRoutes(pool: Pool): Router {
-  const router = express.Router();
+// Delivery callback endpoint for GOV.UK Notify
+// Middleware chain:
+// 1. Bearer token verification
+// 2. Payload structure validation
+// 3. Callback processing
+router.post(
+  '/delivery',
+  validateNotifyBearerTokenMiddleware,
+  validateNotifyCallbackPayloadMiddleware,
+  handleDeliveryCallback
+);
 
-  // Health check endpoint (no authentication)
-  router.get('/health', healthCheck);
-
-  // Delivery callback endpoint
-  // Middleware chain:
-  // 1. Bearer token validation
-  // 2. Payload schema validation
-  // 3. Controller handler
-  router.post(
-    '/delivery',
-    validateNotifyBearerTokenMiddleware,
-    validateNotifyCallbackPayloadMiddleware,
-    (req, res) => handleDeliveryCallback(req, res, pool),
-  );
-
-  return router;
-}
+export default router;

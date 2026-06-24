@@ -1,28 +1,16 @@
-/**
- * Route Setup
- * Registers application routes
- */
-
 import { Express, Request, Response } from 'express';
-import type { Pool } from 'pg';
-import { createNotifyCallbackRoutes } from '../routes/notifyCallback';
-import { checkDatabaseConnectivity } from '../database/db';
+import notifyCallbackRoutes from '../routes/notifyCallback';
 import { HTTP_STATUS } from '../constants/notify.constants';
 import getLogger from '../utils/loggerHelper';
 
 const logger = getLogger(module);
 
-/**
- * Register all application routes
- */
-export function registerRoutes(app: Express, pool: Pool): void {
-  logger.info('[Routes] Registering routes');
+export function registerRoutes(app: Express): void {
+  app.use('/callbacks/notify', notifyCallbackRoutes);
 
-  // Notify callback routes
-  app.use('/callbacks/notify', createNotifyCallbackRoutes(pool));
-
-  // Global health check
-  app.get('/health', async (_req: Request, res: Response) => {
+  app.get('/health', async (req: Request, res: Response) => {
+    const { checkDatabaseConnectivity } = require('../database/db');
+    
     const health: any = {
       status: 'healthy',
       service: 'notify-callback-service',
@@ -49,14 +37,11 @@ export function registerRoutes(app: Express, pool: Pool): void {
       health.status = 'unhealthy';
       health.checks.database = {
         status: 'down',
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
-
       return res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json(health);
     }
 
-    return res.status(HTTP_STATUS.OK).json(health);
+    res.json(health);
   });
-
-  logger.info('[Routes] Routes registered successfully');
 }

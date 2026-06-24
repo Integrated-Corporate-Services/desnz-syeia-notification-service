@@ -1,13 +1,9 @@
-/**
- * Notify Callback Controller
- * Handles incoming GOV.UK Notify delivery callbacks
- */
-
+// Notify Callback Controller
 import { Request, Response } from 'express';
-import type { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { insertNotifyCallbackEvent } from '../repositories/notifyCallbackRepository';
 import { hashRecipient } from '../services/notifyCallbackService';
+import { getPool } from '../database/db';
 import getLogger from '../utils/loggerHelper';
 import { HTTP_STATUS, RESPONSE_MESSAGES } from '../constants/notify.constants';
 import type { NotifyCallbackPayload } from '../types/notifyCallback.types';
@@ -21,7 +17,6 @@ const logger = getLogger(module);
 export async function handleDeliveryCallback(
   req: Request,
   res: Response,
-  pool: Pool,
 ): Promise<Response> {
   const correlationId = (req as any).correlationId || uuidv4();
   const payload: NotifyCallbackPayload = (req as any).notifyPayload;
@@ -45,6 +40,8 @@ export async function handleDeliveryCallback(
   });
 
   try {
+    const pool = getPool();
+    
     // Insert into database (idempotent)
     const result = await insertNotifyCallbackEvent(pool, payload, correlationId);
 

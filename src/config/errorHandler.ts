@@ -1,45 +1,53 @@
-/**
- * Error Handler
- * Global error handling middleware
- */
-
 import { Express, Request, Response, NextFunction } from 'express';
-import { HTTP_STATUS } from '../constants/notify.constants';
 import getLogger from '../utils/loggerHelper';
 
 const logger = getLogger(module);
 
-/**
- * Register error handlers
- */
 export function registerErrorHandler(app: Express): void {
-  logger.info('[ErrorHandler] Registering error handlers');
-
-  // 404 handler
-  app.use((_req: Request, res: Response) => {
-    res.status(404).json({
-      error: 'Not Found',
-      message: 'The requested resource was not found',
+  app.use((req: Request, res: Response) => {
+    logger.warn('[HTTP] Route not found', { 
+      method: req.method, 
+      path: req.path,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      headers: req.headers,
+    });
+    
+    res.status(404).json({ 
+      error: 'Route not found',
+      requestedPath: req.path,
+      requestedUrl: req.url,
+      method: req.method,
+      availableRoutes: {
+        notifyCallback: {
+          health: 'GET /callbacks/notify/health',
+          delivery: 'POST /callbacks/notify/delivery',
+        },
+        general: {
+          health: 'GET /health',
+        },
+      },
+      hint: 'Check if the route path matches exactly (case-sensitive)',
     });
   });
 
-  // Global error handler
-  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-    const correlationId = (req as any).correlationId || 'unknown';
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+      logger.warn('[HTTP] Invalid JSON in request body', {
+        error: err.message,
+        method: req.method,
+        path: req.path,
+      });
+      return res.status(400).json({ error: 'Invalid JSON in request body' });
+    }
 
-    logger.error('[ErrorHandler] Unhandled error', {
-      correlationId,
+    // Handle other errors
+    logger.error('[HTTP] Error', {
       error: err.message,
       stack: err.stack,
-      path: req.path,
       method: req.method,
+      path: req.path,
     });
-
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: 'Internal Server Error',
-      message: 'An unexpected error occurred',
-    });
+    res.status(500).json({ error: 'Internal server error' });
   });
-
-  logger.info('[ErrorHandler] Error handlers registered successfully');
 }
