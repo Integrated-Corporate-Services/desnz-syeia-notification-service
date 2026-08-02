@@ -21,7 +21,7 @@ export async function validateNotifyBearerTokenMiddleware(
 ): Promise<void> {
   // Extract or generate correlation ID
   const correlationId = (req.headers[HEADER_CORRELATION_ID] as string) || uuidv4();
-  (req as any).correlationId = correlationId;
+  (req as Request & { correlationId?: string }).correlationId = correlationId;
 
   const authHeader = req.headers[HEADER_AUTHORIZATION] as string | undefined;
 

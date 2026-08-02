@@ -4,6 +4,7 @@
  */
 
 import type { Pool, QueryResult } from 'pg';
+import { v4 as uuidv4 } from 'uuid';
 import type {
   NotifyCallbackPayload,
   NotifyCallbackEventRow,
@@ -22,7 +23,7 @@ export async function insertNotifyCallbackEvent(
   payload: NotifyCallbackPayload,
   correlationId: string | null,
 ): Promise<InsertResult> {
-  const id = require('uuid').v4();
+  const id = uuidv4();
 
   try {
     await pool.query(
@@ -44,15 +45,16 @@ export async function insertNotifyCallbackEvent(
 
     logger.info('[NotifyRepository] Event inserted', { eventId: id, notifyId: payload.id });
     return { inserted: true, id };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // PostgreSQL unique constraint violation (23505)
-    if (error.code === '23505') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
       logger.info('[NotifyRepository] Duplicate event suppressed', { notifyId: payload.id });
       return { inserted: false, id: null };
     }
 
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('[NotifyRepository] Insert failed', {
-      error: error.message,
+      error: errorMessage,
       notifyId: payload.id,
     });
     throw error;

@@ -31,7 +31,7 @@ export function registerErrorHandler(app: Express): void {
     });
   });
 
-  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof SyntaxError && 'body' in err) {
       logger.warn('[HTTP] Invalid JSON in request body', {
         error: err.message,

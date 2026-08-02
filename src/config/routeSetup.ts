@@ -1,17 +1,24 @@
 import { Express, Request, Response } from 'express';
 import notifyCallbackRoutes from '../routes/notifyCallback';
 import { HTTP_STATUS } from '../constants/notify.constants';
-import getLogger from '../utils/loggerHelper';
-
-const logger = getLogger(module);
+import { checkDatabaseConnectivity } from '../database/db';
 
 export function registerRoutes(app: Express): void {
   app.use('/callbacks/notify', notifyCallbackRoutes);
 
   app.get('/health', async (req: Request, res: Response) => {
-    const { checkDatabaseConnectivity } = require('../database/db');
-    
-    const health: any = {
+    const health: {
+      status: string;
+      service: string;
+      timestamp: string;
+      checks: {
+        database?: {
+          status: string;
+          latency_ms?: number;
+          error?: string;
+        };
+      };
+    } = {
       status: 'healthy',
       service: 'notify-callback-service',
       timestamp: new Date().toISOString(),

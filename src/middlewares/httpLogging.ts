@@ -35,7 +35,7 @@ export function httpLoggingMiddleware(req: Request, res: Response, next: NextFun
   // Capture original res.json to log response
   const originalJson = res.json.bind(res);
   
-  res.json = function (body: any) {
+  res.json = function (body: unknown) {
     const duration = Date.now() - startTime;
     
     // Log response completion

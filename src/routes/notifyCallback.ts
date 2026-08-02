@@ -1,11 +1,10 @@
 // Notify Callback Routes
 import express from 'express';
+import { handleDeliveryCallback, healthCheck } from '../controllers/notifyCallbackController';
+import { validateNotifyBearerTokenMiddleware } from '../middlewares/validateNotifyBearerToken';
+import { validateNotifyCallbackPayloadMiddleware } from '../validators/notifyCallbackPayloadValidator';
+
 const router = express.Router();
-const { handleDeliveryCallback, healthCheck } = require('../controllers/notifyCallbackController');
-const { validateNotifyBearerTokenMiddleware } = require('../middlewares/validateNotifyBearerToken');
-const {
-  validateNotifyCallbackPayloadMiddleware,
-} = require('../validators/notifyCallbackPayloadValidator');
 
 // Health check endpoint
 router.get('/health', healthCheck);

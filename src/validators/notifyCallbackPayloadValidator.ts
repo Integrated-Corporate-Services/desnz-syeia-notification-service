@@ -87,7 +87,7 @@ export function validateNotifyCallbackPayloadMiddleware(
   });
 
   // Attach validated payload to request
-  (req as any).notifyPayload = result.data;
+  (req as Request & { notifyPayload?: typeof result.data }).notifyPayload = result.data;
 
   next();
 }
