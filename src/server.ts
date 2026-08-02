@@ -1,5 +1,5 @@
 // Server Startup
-import express, { Express } from 'express';
+import { Express } from 'express';
 import { createApp } from './app';
 import getLogger from './utils/loggerHelper';
 import { createPool, closePool } from './database/db';

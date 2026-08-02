@@ -15,11 +15,11 @@ const logger = getLogger(module);
  * POST /callbacks/notify/delivery
  */
 export async function handleDeliveryCallback(
-  req: Request,
+  req: Request & { correlationId?: string; notifyPayload?: NotifyCallbackPayload },
   res: Response,
 ): Promise<Response> {
-  const correlationId = (req as any).correlationId || uuidv4();
-  const payload: NotifyCallbackPayload = (req as any).notifyPayload;
+  const correlationId = req.correlationId || uuidv4();
+  const payload = req.notifyPayload;
 
   if (!payload) {
     logger.error('[NotifyController] Missing validated payload', { correlationId });

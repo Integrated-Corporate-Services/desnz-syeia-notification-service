@@ -4,7 +4,6 @@
  */
 
 import dotenv from 'dotenv';
-import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +26,37 @@ function getEnv(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
+function getDbCredentials() {
+  const dbCredentials = process.env.DB_CREDENTIALS;
+  
+  if (!dbCredentials) {
+    throw new Error(
+      'Missing required environment variable: DB_CREDENTIALS'
+    );
+  }
+
+  try {
+    const creds = JSON.parse(dbCredentials);
+    if (!creds.username || !creds.password) {
+      throw new Error(
+        'DB_CREDENTIALS secret must contain both "username" and "password" fields. '
+      );
+    }
+
+    return {
+      user: creds.username,
+      password: creds.password,
+    };
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(
+        'DB_CREDENTIALS is not valid JSON. '
+      );
+    }
+    throw error;
+  }
+}
+
 /**
  * Application configuration object
  */
@@ -38,7 +68,10 @@ const config = {
 
   // Database
   database: {
-    connectionString: requireEnv('DATABASE_URL'),
+    host: requireEnv('DB_HOST'),
+    port: parseInt(getEnv('DB_PORT', '5432'), 10),
+    database: requireEnv('DB_NAME'),
+    ...getDbCredentials(),
     max: parseInt(getEnv('DB_POOL_MAX', '10'), 10),
     idleTimeoutMillis: parseInt(getEnv('DB_IDLE_TIMEOUT_MS', '30000'), 10),
     connectionTimeoutMillis: parseInt(getEnv('DB_CONNECTION_TIMEOUT_MS', '5000'), 10),

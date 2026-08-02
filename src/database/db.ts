@@ -20,12 +20,18 @@ export function createPool(): Pool {
   }
 
   logger.info('[Database] Creating connection pool', {
+    host: config.database.host,
+    port: config.database.port,
+    database: config.database.database,
     max: config.database.max,
-    connectionString: config.database.connectionString.replace(/\/\/.*@/, '//*****@'), // Mask credentials
   });
 
   pool = new Pool({
-    connectionString: config.database.connectionString,
+    host: config.database.host,
+    port: config.database.port,
+    database: config.database.database,
+    user: config.database.user,
+    password: config.database.password,
     max: config.database.max,
     idleTimeoutMillis: config.database.idleTimeoutMillis,
     connectionTimeoutMillis: config.database.connectionTimeoutMillis,

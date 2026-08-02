@@ -36,7 +36,7 @@ export function requestContextMiddleware(req: Request, res: Response, next: Next
   // Store context for this request's async execution
   requestContextStorage.run(context, () => {
     // Attach context to request object for easy access
-    (req as any).context = context;
+    (req as Request & { context?: typeof context }).context = context;
     next();
   });
 }
