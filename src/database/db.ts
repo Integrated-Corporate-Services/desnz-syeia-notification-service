@@ -12,6 +12,20 @@ const logger = getLogger(module);
 let pool: Pool | null = null;
 
 /**
+ * RDS requires SSL. Disable only for local/dev when PGSSLMODE=disable or NODE_ENV=local.
+ */
+function buildSslConfig(): false | { rejectUnauthorized: boolean } {
+  const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+  const sslMode = (process.env.PGSSLMODE || '').toLowerCase();
+
+  if (nodeEnv === 'local' || sslMode === 'disable') {
+    return false;
+  }
+
+  return { rejectUnauthorized: false };
+}
+
+/**
  * Create PostgreSQL connection pool
  */
 export function createPool(): Pool {
@@ -19,11 +33,14 @@ export function createPool(): Pool {
     return pool;
   }
 
+  const ssl = buildSslConfig();
+
   logger.info('[Database] Creating connection pool', {
     host: config.database.host,
     port: config.database.port,
     database: config.database.database,
     max: config.database.max,
+    ssl: Boolean(ssl),
   });
 
   pool = new Pool({
@@ -35,6 +52,7 @@ export function createPool(): Pool {
     max: config.database.max,
     idleTimeoutMillis: config.database.idleTimeoutMillis,
     connectionTimeoutMillis: config.database.connectionTimeoutMillis,
+    ssl,
   });
 
   // Connection event handlers
