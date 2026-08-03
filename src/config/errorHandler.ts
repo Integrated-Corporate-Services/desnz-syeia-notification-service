@@ -20,8 +20,8 @@ export function registerErrorHandler(app: Express): void {
       method: req.method,
       availableRoutes: {
         notifyCallback: {
-          health: 'GET /callbacks/notify/health',
-          delivery: 'POST /callbacks/notify/delivery',
+          health: 'GET /notify-callback/health',
+          delivery: 'POST /notify-callback/delivery',
         },
         general: {
           health: 'GET /health',
