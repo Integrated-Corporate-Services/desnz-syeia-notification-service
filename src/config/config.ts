@@ -61,9 +61,9 @@ function getDbCredentials() {
  * Application configuration object
  */
 const config = {
-  // Server
+  // Server — default 0.0.0.0 so ALB/ECS health checks can reach the container
   port: parseInt(getEnv('PORT', '3002'), 10),
-  host: getEnv('HOST', 'localhost'),
+  host: getEnv('HOST', '0.0.0.0'),
   nodeEnv: getEnv('NODE_ENV', 'development'),
 
   // Database
