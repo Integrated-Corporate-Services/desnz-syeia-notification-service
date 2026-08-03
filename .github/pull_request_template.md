@@ -31,21 +31,6 @@
 - [ ] Integration tests added/updated
 - [ ] Manual testing completed
 
-## Database/Config Changes
-<!-- If applicable, list any required changes -->
-- [ ] Environment variables added/changed
-- [ ] AWS Secrets Manager updates needed
-- [ ] Database migrations required
-- [ ] ECS task definition updates needed
-- [ ] N/A - No config changes
-
-## Deployment Notes
-<!-- Any special steps or considerations for deployment -->
-- [ ] Can be deployed independently
-- [ ] Requires coordination with other services
-- [ ] Requires database backup
-- [ ] Requires manual verification post-deployment
-
 ## Screenshots/Logs
 <!-- If applicable, add visuals or log examples -->
 

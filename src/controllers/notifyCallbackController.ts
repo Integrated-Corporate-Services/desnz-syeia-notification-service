@@ -12,7 +12,7 @@ const logger = getLogger(module);
 
 /**
  * Handle delivery callback from GOV.UK Notify
- * POST /callbacks/notify/delivery
+ * POST /notify-callback/delivery
  */
 export async function handleDeliveryCallback(
   req: Request & { correlationId?: string; notifyPayload?: NotifyCallbackPayload },
