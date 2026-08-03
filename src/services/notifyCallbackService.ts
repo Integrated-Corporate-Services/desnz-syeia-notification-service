@@ -35,7 +35,43 @@ function getSecretsManagerClient(): SecretsManagerClient {
 }
 
 /**
- * Get notify callback bearer token from AWS Secrets Manager (with 5-min cache)
+ * True when the value looks like a Secrets Manager secret id (name or ARN),
+ * not a raw bearer token injected into the env var by ECS.
+ */
+function isSecretsManagerSecretId(value: string): boolean {
+  if (value.startsWith('arn:aws:secretsmanager:')) {
+    return true;
+  }
+
+  // Typical secret names / paths (e.g. notify/callback-bearer-token)
+  // Raw injected tokens are usually long opaque strings without a path shape.
+  if (value.includes('/') && value.length <= 256) {
+    return true;
+  }
+
+  return false;
+}
+
+function cacheAndReturnToken(token: string, source: string): string {
+  if (token.length < MIN_TOKEN_LENGTH) {
+    throw new Error(`Token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
+  }
+
+  tokenCache = {
+    token,
+    expiresAt: Date.now() + config.notify.secretTtlMs,
+  };
+
+  logger.info('[NotifyService] Bearer token loaded', { source });
+  return token;
+}
+
+/**
+ * Get notify callback bearer token (with short-lived cache).
+ * Resolution order:
+ *  1. NOTIFY_CALLBACK_BEARER_TOKEN (direct token)
+ *  2. Secrets Manager via NOTIFY_CALLBACK_SECRET_NAME (when it looks like a secret id)
+ *  3. NOTIFY_CALLBACK_SECRET_NAME as a raw token (ECS/SSM value injection)
  */
 export async function getNotifyCallbackToken(): Promise<string> {
   // Check cache first
@@ -44,56 +80,58 @@ export async function getNotifyCallbackToken(): Promise<string> {
     return tokenCache.token;
   }
 
-  // Try Secrets Manager first
-  if (config.notify.secretName) {
+  // Preferred: direct token from env (local or ECS secret injection into this var)
+  if (config.notify.fallbackToken) {
+    return cacheAndReturnToken(
+      config.notify.fallbackToken.trim(),
+      'NOTIFY_CALLBACK_BEARER_TOKEN',
+    );
+  }
+
+  const secretName = config.notify.secretName?.trim();
+
+  // Secrets Manager lookup when the env value is a secret name/ARN
+  if (secretName && isSecretsManagerSecretId(secretName)) {
     try {
       logger.debug('[NotifyService] Fetching bearer token from Secrets Manager', {
-        secretName: config.notify.secretName,
+        secretName,
       });
 
       const command = new GetSecretValueCommand({
-        SecretId: config.notify.secretName,
+        SecretId: secretName,
       });
 
       const response = await getSecretsManagerClient().send(command);
       const token = response.SecretString?.trim();
 
-      if (!token || token.length < MIN_TOKEN_LENGTH) {
-        throw new Error(`Token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
+      if (!token) {
+        throw new Error('Secrets Manager returned empty SecretString');
       }
 
-      // Cache for 5 minutes
-      tokenCache = {
-        token,
-        expiresAt: Date.now() + config.notify.secretTtlMs,
-      };
-
-      logger.info('[NotifyService] Bearer token loaded from Secrets Manager');
-      return token;
+      return cacheAndReturnToken(token, 'SecretsManager');
     } catch (error) {
       logger.error('[NotifyService] Failed to fetch from Secrets Manager', {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // In production, fail hard
       if (config.nodeEnv === 'production') {
         throw new Error('Cannot retrieve Notify callback token from Secrets Manager in production');
       }
     }
   }
 
-  // Development fallback: environment variable
-  if (config.notify.fallbackToken) {
-    logger.warn('[NotifyService] Using fallback bearer token from environment (DEVELOPMENT ONLY)');
-
-    if (config.notify.fallbackToken.length < MIN_TOKEN_LENGTH) {
-      throw new Error(`Fallback token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
-    }
-
-    return config.notify.fallbackToken;
+  // ECS often injects the SSM/Secrets Manager *value* into NOTIFY_CALLBACK_SECRET_NAME.
+  // Treat that as the bearer token when it does not look like a secret id.
+  if (secretName && !isSecretsManagerSecretId(secretName)) {
+    logger.warn(
+      '[NotifyService] Using NOTIFY_CALLBACK_SECRET_NAME as direct bearer token (injected value)',
+    );
+    return cacheAndReturnToken(secretName, 'NOTIFY_CALLBACK_SECRET_NAME');
   }
 
-  throw new Error('No bearer token configured (neither Secrets Manager nor fallback)');
+  throw new Error(
+    'No bearer token configured. Set NOTIFY_CALLBACK_BEARER_TOKEN, or NOTIFY_CALLBACK_SECRET_NAME as a Secrets Manager id or injected token value.',
+  );
 }
 
 /**
