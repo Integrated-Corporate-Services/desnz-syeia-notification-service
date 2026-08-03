@@ -2,8 +2,12 @@
 // Sets up test environment variables
 
 process.env.NODE_ENV = 'test';
+process.env.HOST = '0.0.0.0';
 process.env.PORT = '3002';
 process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5435/syeia_db_test';
+process.env.DB_HOST = 'localhost';
+process.env.DB_NAME = 'syeia_db_test';
+process.env.DB_CREDENTIALS = '{"username":"postgres","password":"postgres"}';
 
 // AWS Configuration (LocalStack)
 process.env.AWS_REGION = 'eu-west-2';

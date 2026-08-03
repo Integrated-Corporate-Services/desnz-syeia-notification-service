@@ -8,7 +8,7 @@ import config from './config/config';
 const logger = getLogger(module);
 
 const PORT = config.port;
-const HOST = config.host || '0.0.0.0';
+const HOST = config.host;
 const SHUTDOWN_TIMEOUT_MS = 30000; // 30 seconds
 
 /**

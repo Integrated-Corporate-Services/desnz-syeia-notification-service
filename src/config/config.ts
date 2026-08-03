@@ -61,10 +61,9 @@ function getDbCredentials() {
  * Application configuration object
  */
 const config = {
-  // Server — bind 0.0.0.0 so ALB/ECS health checks can reach the container.
-  // Override with HOST=localhost for local-only binding if needed.
+  // Server — HOST must be set by the environment (use 0.0.0.0 for ECS/ALB).
   port: parseInt(getEnv('PORT', '3002'), 10),
-  host: getEnv('HOST', '0.0.0.0'),
+  host: requireEnv('HOST'),
   nodeEnv: getEnv('NODE_ENV', 'development'),
 
   // Database
@@ -79,12 +78,11 @@ const config = {
   },
 
   // Notify Configuration
-  // NOTIFY_CALLBACK_SECRET_NAME may be either:
-  //   - a Secrets Manager secret name/ARN to look up, or
-  //   - the raw bearer token when ECS injects an SSM/Secrets Manager value into this env var
-  // NOTIFY_CALLBACK_BEARER_TOKEN is the preferred direct-token env (local or ECS injection)
+  // Provide one of:
+  //   - NOTIFY_CALLBACK_BEARER_TOKEN (direct token), or
+  //   - NOTIFY_CALLBACK_SECRET_NAME (Secrets Manager name/ARN, or raw token if ECS injects the value)
   notify: {
-    secretName: process.env.NOTIFY_CALLBACK_SECRET_NAME || 'notify/callback-bearer-token',
+    secretName: process.env.NOTIFY_CALLBACK_SECRET_NAME,
     secretTtlMs: parseInt(getEnv('NOTIFY_SECRET_TTL_MS', '300000'), 10), // 5 minutes
     fallbackToken: process.env.NOTIFY_CALLBACK_BEARER_TOKEN,
   },

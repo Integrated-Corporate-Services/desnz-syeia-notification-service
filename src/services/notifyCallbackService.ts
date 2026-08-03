@@ -34,24 +34,6 @@ function getSecretsManagerClient(): SecretsManagerClient {
   return secretsManagerClient;
 }
 
-/**
- * True when the value looks like a Secrets Manager secret id (name or ARN),
- * not a raw bearer token injected into the env var by ECS.
- */
-function isSecretsManagerSecretId(value: string): boolean {
-  if (value.startsWith('arn:aws:secretsmanager:')) {
-    return true;
-  }
-
-  // Typical secret names / paths (e.g. notify/callback-bearer-token)
-  // Raw injected tokens are usually long opaque strings without a path shape.
-  if (value.includes('/') && value.length <= 256) {
-    return true;
-  }
-
-  return false;
-}
-
 function cacheAndReturnToken(token: string, source: string): string {
   if (token.length < MIN_TOKEN_LENGTH) {
     throw new Error(`Token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
@@ -70,7 +52,7 @@ function cacheAndReturnToken(token: string, source: string): string {
  * Get notify callback bearer token (with short-lived cache).
  * Resolution order:
  *  1. NOTIFY_CALLBACK_BEARER_TOKEN (direct token)
- *  2. Secrets Manager via NOTIFY_CALLBACK_SECRET_NAME (when it looks like a secret id)
+ *  2. Secrets Manager lookup via NOTIFY_CALLBACK_SECRET_NAME
  *  3. NOTIFY_CALLBACK_SECRET_NAME as a raw token (ECS/SSM value injection)
  */
 export async function getNotifyCallbackToken(): Promise<string> {
@@ -89,49 +71,42 @@ export async function getNotifyCallbackToken(): Promise<string> {
   }
 
   const secretName = config.notify.secretName?.trim();
+  if (!secretName) {
+    throw new Error(
+      'No bearer token configured. Set NOTIFY_CALLBACK_BEARER_TOKEN or NOTIFY_CALLBACK_SECRET_NAME.',
+    );
+  }
 
-  // Secrets Manager lookup when the env value is a secret name/ARN
-  if (secretName && isSecretsManagerSecretId(secretName)) {
-    try {
-      logger.debug('[NotifyService] Fetching bearer token from Secrets Manager', {
-        secretName,
-      });
+  // Try Secrets Manager first (works for name or ARN)
+  try {
+    logger.debug('[NotifyService] Fetching bearer token from Secrets Manager', {
+      secretName,
+    });
 
-      const command = new GetSecretValueCommand({
-        SecretId: secretName,
-      });
+    const command = new GetSecretValueCommand({
+      SecretId: secretName,
+    });
 
-      const response = await getSecretsManagerClient().send(command);
-      const token = response.SecretString?.trim();
+    const response = await getSecretsManagerClient().send(command);
+    const token = response.SecretString?.trim();
 
-      if (!token) {
-        throw new Error('Secrets Manager returned empty SecretString');
-      }
-
-      return cacheAndReturnToken(token, 'SecretsManager');
-    } catch (error) {
-      logger.error('[NotifyService] Failed to fetch from Secrets Manager', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      if (config.nodeEnv === 'production') {
-        throw new Error('Cannot retrieve Notify callback token from Secrets Manager in production');
-      }
+    if (!token) {
+      throw new Error('Secrets Manager returned empty SecretString');
     }
+
+    return cacheAndReturnToken(token, 'SecretsManager');
+  } catch (error) {
+    logger.error('[NotifyService] Failed to fetch from Secrets Manager', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   // ECS often injects the SSM/Secrets Manager *value* into NOTIFY_CALLBACK_SECRET_NAME.
-  // Treat that as the bearer token when it does not look like a secret id.
-  if (secretName && !isSecretsManagerSecretId(secretName)) {
-    logger.warn(
-      '[NotifyService] Using NOTIFY_CALLBACK_SECRET_NAME as direct bearer token (injected value)',
-    );
-    return cacheAndReturnToken(secretName, 'NOTIFY_CALLBACK_SECRET_NAME');
-  }
-
-  throw new Error(
-    'No bearer token configured. Set NOTIFY_CALLBACK_BEARER_TOKEN, or NOTIFY_CALLBACK_SECRET_NAME as a Secrets Manager id or injected token value.',
+  // If Secrets Manager lookup failed, treat the env value as the bearer token itself.
+  logger.warn(
+    '[NotifyService] Using NOTIFY_CALLBACK_SECRET_NAME as direct bearer token (injected value)',
   );
+  return cacheAndReturnToken(secretName, 'NOTIFY_CALLBACK_SECRET_NAME');
 }
 
 /**
