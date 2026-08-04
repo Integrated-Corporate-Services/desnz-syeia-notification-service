@@ -10,10 +10,7 @@ import type { NotifyCallbackPayload } from '../types/notifyCallback.types';
 
 const logger = getLogger(module);
 
-/**
- * Handle delivery callback from GOV.UK Notify
- * POST /notify-callback/delivery
- */
+
 export async function handleDeliveryCallback(
   req: Request & { correlationId?: string; notifyPayload?: NotifyCallbackPayload },
   res: Response,

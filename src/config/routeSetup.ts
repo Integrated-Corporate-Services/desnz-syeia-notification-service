@@ -4,7 +4,7 @@ import { HTTP_STATUS } from '../constants/notify.constants';
 import { checkDatabaseConnectivity } from '../database/db';
 
 export function registerRoutes(app: Express): void {
-  app.use('/notify-callback', notifyCallbackRoutes);
+  app.use('/callback/notify', notifyCallbackRoutes);
 
   app.get('/health', async (req: Request, res: Response) => {
     const health: {
