@@ -66,7 +66,7 @@ let server: ReturnType<Express['listen']>;
       url: `http://${HOST}:${PORT}/health`,
     });
     logger.info('[SERVER] Callback endpoint available at', {
-      url: `http://${HOST}:${PORT}/notify-callback/delivery`,
+      url: `http://${HOST}:${PORT}/callback/notify/delivery`,
     });
   });
 
