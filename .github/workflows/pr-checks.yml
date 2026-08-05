@@ -83,7 +83,7 @@ jobs:
           echo "Build successful"
 
   lint:
-    name: Lint Code
+    name: Lint Check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,7 +101,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Run Linter
+      - name: Run Lint
         run: npm run lint
 
   test:
