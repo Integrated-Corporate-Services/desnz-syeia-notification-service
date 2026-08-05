@@ -1,7 +1,7 @@
 {
   "name": "desnz-syeia-notification-callback-service",
   "version": "1.0.0",
-  "private": true,
+  "private": false,
   "description": "GOV.UK Notify callback receiver service for DESNZ SYEIA",
   "main": "dist/server.js",
   "type": "commonjs",
@@ -61,6 +61,14 @@
     "notifications"
   ],
   "author": "DESNZ SYEIA Team",
-  "license": "ISC"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UKGovernmentBEIS/desnz-syeia-notification-service"
+  },
+  "bugs": {
+    "url": "https://github.com/UKGovernmentBEIS/desnz-syeia-notification-service/issues"
+  },
+  "homepage": "https://github.com/UKGovernmentBEIS/desnz-syeia-notification-service#readme"
 }
 
