@@ -3,19 +3,17 @@ import express from 'express';
 import { handleDeliveryCallback, healthCheck } from '../controllers/notifyCallbackController';
 import { validateNotifyBearerTokenMiddleware } from '../middlewares/validateNotifyBearerToken';
 import { validateNotifyCallbackPayloadMiddleware } from '../validators/notifyCallbackPayloadValidator';
+import { webhookRateLimiter, healthCheckRateLimiter } from '../middlewares/rateLimiter';
 
 const router = express.Router();
 
 // Health check endpoint
-router.get('/health', healthCheck);
+router.get('/health', healthCheckRateLimiter, healthCheck);
 
 // Delivery callback endpoint for GOV.UK Notify
-// Middleware chain:
-// 1. Bearer token verification
-// 2. Payload structure validation
-// 3. Callback processing
 router.post(
   '/delivery',
+  webhookRateLimiter,
   validateNotifyBearerTokenMiddleware,
   validateNotifyCallbackPayloadMiddleware,
   handleDeliveryCallback
