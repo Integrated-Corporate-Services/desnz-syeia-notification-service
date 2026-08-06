@@ -6,6 +6,7 @@
 import { Pool } from 'pg';
 import config from '../config/config';
 import getLogger from '../utils/loggerHelper';
+import { createSanitizedErrorLog } from '../utils/errorSanitizer';
 
 const logger = getLogger(module);
 
@@ -36,9 +37,6 @@ export function createPool(): Pool {
   const ssl = buildSslConfig();
 
   logger.info('[Database] Creating connection pool', {
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.database,
     max: config.database.max,
     ssl: Boolean(ssl),
   });
@@ -61,9 +59,10 @@ export function createPool(): Pool {
   });
 
   pool.on('error', (err) => {
+    const sanitizedError = createSanitizedErrorLog(err);
     logger.error('[Database] Pool error', {
-      error: err.message,
-      stack: err.stack,
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
     });
   });
 
@@ -111,7 +110,11 @@ export async function checkDatabaseConnectivity(): Promise<{
     return { connected: true, latencyMs };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('[Database] Connectivity check failed', { error: errorMessage });
+    const sanitizedError = createSanitizedErrorLog(error);
+    logger.error('[Database] Connectivity check failed', {
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
+    });
 
     return { connected: false, error: errorMessage };
   }

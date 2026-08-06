@@ -20,7 +20,25 @@ const isCloudEnv = ['prod', 'production', 'pre-prod', 'staging', 'dev', 'develop
 
 const isProdEnv = ['prod', 'production'].includes(process.env.NODE_ENV || '');
 
-const logLevel = config.logLevel || process.env.LOG_LEVEL || (isCloudEnv ? 'info' : 'debug');
+const isLocalOrTest = ['local', 'test'].includes((process.env.NODE_ENV || '').toLowerCase());
+
+/**
+ * Resolve log level. Outside local/test, force info+ (ignore LOG_LEVEL=debug).
+ */
+function resolveLogLevel(): string {
+  const requested = String(
+    config.logLevel || process.env.LOG_LEVEL || (isCloudEnv ? 'info' : 'debug')
+  ).toLowerCase();
+
+  if (!isLocalOrTest) {
+    const allowedCloudLevels = ['info', 'warn', 'error'];
+    return allowedCloudLevels.includes(requested) ? requested : 'info';
+  }
+
+  return requested;
+}
+
+const logLevel = resolveLogLevel();
 
 // Create Winston logger instance
 const winstonLogger: WinstonLogger = createLogger({
@@ -62,58 +80,153 @@ if (isCloudEnv) {
 }
 
 /**
- * Filter sensitive fields based on environment
- * In production: Hide detailed technical info
- * In lower environments: Show everything for debugging
+ * Filter sensitive fields based on environment.
+ * Cloud envs: strip privacy-sensitive technical fields.
+ * Production additionally strips stack traces and rawBody.
  */
 function filterByEnvironment(data: Record<string, unknown>): Record<string, unknown> {
-  if (!isProdEnv) {
-    // Lower environments: show everything
+  if (!isCloudEnv) {
     return data;
   }
 
-  // Production: Remove potentially sensitive technical details
   const filtered = { ...data };
-  delete filtered.stack;
-  delete filtered.rawBody;
+  const cloudExcludedFields = [
+    'query',
+    'headers',
+    'user_agent',
+    'source_ip',
+    'rawBody',
+  ];
+
+  for (const field of cloudExcludedFields) {
+    if (field in filtered) {
+      delete filtered[field];
+    }
+  }
+
+  if (isProdEnv && 'stack' in filtered) {
+    delete filtered.stack;
+  }
+
   return filtered;
 }
 
 /**
- * Get logger with module context
+ * Enrich log data with request context.
  */
+function enrichLogData(data: LogData, moduleName: string): Record<string, unknown> {
+  const context = getRequestContext();
+
+  let enriched: Record<string, unknown> = {
+    module: moduleName,
+    ...data,
+  };
+
+  if (context) {
+    enriched = {
+      ...enriched,
+      request_id: context.request_id,
+      method: context.method,
+      path: context.path,
+      correlation_id: context.correlation_id,
+      // IP / UA only for local debugging — never attached in cloud envs
+      ...(isCloudEnv ? {} : {
+        user_agent: context.user_agent,
+        source_ip: context.source_ip,
+      }),
+    };
+  }
+
+  return enriched;
+}
+
+/**
+ * Sanitize log data to prevent sensitive information leakage
+ */
+function sanitizeData(data: unknown): unknown {
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  if (typeof data !== 'object') {
+    return data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeData(item));
+  }
+
+  const dataAsRecord = data as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = { ...dataAsRecord };
+  const sensitiveKeys = [
+    'password',
+    'secret',
+    'token',
+    'apikey',
+    'api_key',
+    'authorization',
+    'auth',
+    'private_key',
+    'privatekey',
+    'webhook_secret',
+    'signing_key',
+    'signingkey',
+    'signature',
+    'email',
+    'phone',
+    'recipient',
+    'body',
+    'payload',
+    'raw_payload',
+    'rawbody',
+    'hmac',
+    'bearer',
+  ];
+  // Exact-match keys that are too short for substring matching
+  const exactSensitiveKeys = new Set(['to']);
+
+  for (const key of Object.keys(sanitized)) {
+    const lowerKey = key.toLowerCase();
+    if (
+      exactSensitiveKeys.has(lowerKey) ||
+      sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive))
+    ) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+      sanitized[key] = sanitizeData(sanitized[key]);
+    }
+  }
+
+  return sanitized;
+}
+
 function getLogger(module: NodeModule): Logger {
-  const modulePath = module.filename || 'unknown';
-  const moduleName = modulePath.split(/[\\/]/).pop() || 'unknown';
+  const moduleName = module.filename ? module.filename.split(/[/\\]/).pop() || 'unknown' : 'unknown';
 
   return {
-    info: (message: string, data?: LogData) => {
-      const context = getRequestContext();
-      winstonLogger.info(message, {
-        module: moduleName,
-        ...filterByEnvironment({ ...data, ...context } as Record<string, unknown>),
-      });
+    info: (message: string, data: LogData = {}): void => {
+      let enrichedData = enrichLogData(data, moduleName);
+      enrichedData = filterByEnvironment(enrichedData);
+      const sanitizedData = sanitizeData(enrichedData) as Record<string, unknown>;
+      winstonLogger.info(message, sanitizedData);
     },
-    error: (message: string, data?: LogData) => {
-      const context = getRequestContext();
-      winstonLogger.error(message, {
-        module: moduleName,
-        ...filterByEnvironment({ ...data, ...context } as Record<string, unknown>),
-      });
+    error: (message: string, data: LogData = {}): void => {
+      let enrichedData = enrichLogData(data, moduleName);
+      enrichedData = filterByEnvironment(enrichedData);
+      const sanitizedData = sanitizeData(enrichedData) as Record<string, unknown>;
+      winstonLogger.error(message, sanitizedData);
     },
-    warn: (message: string, data?: LogData) => {
-      const context = getRequestContext();
-      winstonLogger.warn(message, {
-        module: moduleName,
-        ...filterByEnvironment({ ...data, ...context } as Record<string, unknown>),
-      });
+    warn: (message: string, data: LogData = {}): void => {
+      let enrichedData = enrichLogData(data, moduleName);
+      enrichedData = filterByEnvironment(enrichedData);
+      const sanitizedData = sanitizeData(enrichedData) as Record<string, unknown>;
+      winstonLogger.warn(message, sanitizedData);
     },
-    debug: (message: string, data?: LogData) => {
-      const context = getRequestContext();
-      winstonLogger.debug(message, {
-        module: moduleName,
-        ...filterByEnvironment({ ...data, ...context } as Record<string, unknown>),
-      });
+    debug: (message: string, data: LogData = {}): void => {
+      let enrichedData = enrichLogData(data, moduleName);
+      enrichedData = filterByEnvironment(enrichedData);
+      const sanitizedData = sanitizeData(enrichedData) as Record<string, unknown>;
+      winstonLogger.debug(message, sanitizedData);
     },
   };
 }

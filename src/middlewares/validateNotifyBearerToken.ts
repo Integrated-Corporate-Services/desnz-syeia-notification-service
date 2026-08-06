@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { verifyNotifyBearerToken } from '../services/notifyCallbackService';
 import getLogger from '../utils/loggerHelper';
+import { createSanitizedErrorLog } from '../utils/errorSanitizer';
 import { HTTP_STATUS, HEADER_AUTHORIZATION, HEADER_CORRELATION_ID } from '../constants/notify.constants';
 
 const logger = getLogger(module);
@@ -50,9 +51,11 @@ export async function validateNotifyBearerTokenMiddleware(
     logger.debug('[NotifyAuth] Authentication successful', { correlationId });
     next();
   } catch (error) {
+    const sanitizedError = createSanitizedErrorLog(error);
     logger.error('[NotifyAuth] Authentication error', {
       correlationId,
-      error: error instanceof Error ? error.message : String(error),
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
     });
 
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

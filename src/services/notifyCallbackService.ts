@@ -7,6 +7,7 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 import crypto from 'crypto';
 import config from '../config/config';
 import getLogger from '../utils/loggerHelper';
+import { createSanitizedErrorLog } from '../utils/errorSanitizer';
 import type { AuthResult } from '../types/notifyCallback.types';
 import { MIN_TOKEN_LENGTH, ERROR_CODES, RESPONSE_MESSAGES } from '../constants/notify.constants';
 
@@ -47,9 +48,7 @@ export async function getNotifyCallbackToken(): Promise<string> {
   // Try Secrets Manager first
   if (config.notify.secretName) {
     try {
-      logger.debug('[NotifyService] Fetching bearer token from Secrets Manager', {
-        secretName: config.notify.secretName,
-      });
+      logger.debug('[NotifyService] Fetching bearer token from Secrets Manager');
 
       const command = new GetSecretValueCommand({
         SecretId: config.notify.secretName,
@@ -71,8 +70,10 @@ export async function getNotifyCallbackToken(): Promise<string> {
       logger.info('[NotifyService] Bearer token loaded from Secrets Manager');
       return token;
     } catch (error) {
+      const sanitizedError = createSanitizedErrorLog(error);
       logger.error('[NotifyService] Failed to fetch from Secrets Manager', {
-        error: error instanceof Error ? error.message : String(error),
+        error_message: sanitizedError.sanitized_message,
+        error_type: sanitizedError.error_type,
       });
 
       // In production, fail hard
@@ -126,8 +127,10 @@ export async function verifyNotifyBearerToken(authHeader: string | undefined): P
   try {
     expectedToken = await getNotifyCallbackToken();
   } catch (error) {
+    const sanitizedError = createSanitizedErrorLog(error);
     logger.error('[NotifyService] Failed to get expected token', {
-      error: error instanceof Error ? error.message : String(error),
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
     });
     throw error;
   }

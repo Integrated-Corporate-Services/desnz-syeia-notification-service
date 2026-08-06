@@ -11,6 +11,7 @@ import type {
   InsertResult,
 } from '../types/notifyCallback.types';
 import getLogger from '../utils/loggerHelper';
+import { createSanitizedErrorLog } from '../utils/errorSanitizer';
 
 const logger = getLogger(module);
 
@@ -52,9 +53,10 @@ export async function insertNotifyCallbackEvent(
       return { inserted: false, id: null };
     }
 
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const sanitizedError = createSanitizedErrorLog(error);
     logger.error('[NotifyRepository] Insert failed', {
-      error: errorMessage,
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
       notifyId: payload.id,
     });
     throw error;

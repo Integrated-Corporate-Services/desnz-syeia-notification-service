@@ -92,7 +92,17 @@ const config = {
 
   // Logging
   logDir: getEnv('LOG_DIR', './logs'),
-  logLevel: getEnv('LOG_LEVEL', 'info'),
+  // Outside local/test, ignore debug — keep info+ only
+  logLevel: (() => {
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    const isLocalOrTest = nodeEnv === 'local' || nodeEnv === 'test';
+    const requested = getEnv('LOG_LEVEL', isLocalOrTest ? 'debug' : 'info').toLowerCase();
+    if (!isLocalOrTest) {
+      const allowed = ['info', 'warn', 'error'];
+      return allowed.includes(requested) ? requested : 'info';
+    }
+    return requested;
+  })(),
 };
 
 export default config;

@@ -68,14 +68,21 @@ export function validateNotifyCallbackPayloadMiddleware(
   const result = validateNotifyCallbackPayload(req.body);
 
   if (!result.valid) {
+    // Log path/code/message only — omit Zod received values (may contain email/phone in `to`)
+    const safeErrors = (result.errors?.errors || []).map((issue) => ({
+      path: issue.path.join('.'),
+      code: issue.code,
+      message: issue.message,
+    }));
+
     logger.warn('[NotifyValidator] Payload validation failed', {
       correlationId,
-      errors: result.errors?.errors,
+      errors: safeErrors,
     });
 
     res.status(HTTP_STATUS.BAD_REQUEST).json({
       error: 'Invalid callback payload',
-      details: result.errors?.errors,
+      details: safeErrors.map(({ path, code }) => ({ path, code })),
     });
     return;
   }

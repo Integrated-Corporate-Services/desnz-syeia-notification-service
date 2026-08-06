@@ -1,7 +1,6 @@
 import { Express, Request } from 'express';
 import express from 'express';
 import { securityHeadersMiddleware } from '../middlewares/securityHeaders';
-import { requestLoggerMiddleware } from '../middlewares/requestLogger';
 import { requestContextMiddleware } from '../middlewares/requestContext';
 import { httpLoggingMiddleware } from '../middlewares/httpLogging';
 
@@ -24,6 +23,6 @@ export function registerMiddleware(app: Express): void {
 
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
+  // Single HTTP access logger (method/path/status/duration) — no body/headers
   app.use(httpLoggingMiddleware);
-  app.use(requestLoggerMiddleware);
 }

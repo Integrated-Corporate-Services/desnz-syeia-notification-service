@@ -5,6 +5,7 @@ import { insertNotifyCallbackEvent } from '../repositories/notifyCallbackReposit
 import { hashRecipient } from '../services/notifyCallbackService';
 import { getPool } from '../database/db';
 import getLogger from '../utils/loggerHelper';
+import { createSanitizedErrorLog } from '../utils/errorSanitizer';
 import { HTTP_STATUS, RESPONSE_MESSAGES } from '../constants/notify.constants';
 import type { NotifyCallbackPayload } from '../types/notifyCallback.types';
 
@@ -64,10 +65,12 @@ export async function handleDeliveryCallback(
       received: true,
     });
   } catch (error) {
+    const sanitizedError = createSanitizedErrorLog(error);
     logger.error('[NotifyController] Database error', {
       correlationId,
       notifyNotificationId: payload.id,
-      error: error instanceof Error ? error.message : String(error),
+      error_message: sanitizedError.sanitized_message,
+      error_type: sanitizedError.error_type,
     });
 
     return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

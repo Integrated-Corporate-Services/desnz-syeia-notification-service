@@ -12,7 +12,6 @@ export const webhookRateLimiter: RateLimitRequestHandler = rateLimit({
   ...toExpressRateLimitOptions(WEBHOOK_RATE_LIMIT),
   handler: (req, res) => {
     logger.warn('Rate limit exceeded for webhook endpoint', {
-      ip: req.ip,
       path: req.path,
       method: req.method,
     });
@@ -29,8 +28,8 @@ export const healthCheckRateLimiter: RateLimitRequestHandler = rateLimit({
   ...toExpressRateLimitOptions(HEALTH_CHECK_RATE_LIMIT),
   handler: (req, res) => {
     logger.warn('Rate limit exceeded for health check endpoint', {
-      ip: req.ip,
       path: req.path,
+      method: req.method,
     });
     
     res.status(429).json({
@@ -55,7 +54,6 @@ export function createCustomRateLimiter(
     legacyHeaders: false,
     handler: (req, res) => {
       logger.warn('Rate limit exceeded', {
-        ip: req.ip,
         path: req.path,
         method: req.method,
       });
