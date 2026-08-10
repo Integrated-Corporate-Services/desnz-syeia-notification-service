@@ -14,11 +14,13 @@ interface Logger {
   debug: (message: string, data?: LogData) => void;
 }
 
+const nodeEnv = (process.env.NODE_ENV || config.nodeEnv || '').toLowerCase();
+
 const isCloudEnv = ['prod', 'production', 'pre-prod', 'staging', 'dev', 'development'].includes(
-  process.env.NODE_ENV || ''
+  nodeEnv
 );
 
-const isProdEnv = ['prod', 'production'].includes(process.env.NODE_ENV || '');
+const isProdEnv = ['prod', 'production'].includes(nodeEnv);
 
 // Log level is enforced in config.ts (info+ outside local/test)
 const logLevel = String(config.logLevel || (isCloudEnv ? 'info' : 'debug')).toLowerCase();
@@ -64,8 +66,8 @@ if (isCloudEnv) {
 
 /**
  * Filter sensitive fields based on environment.
- * Cloud envs: strip privacy-sensitive technical fields.
- * Production additionally strips stack traces and rawBody.
+ * Cloud envs: strip privacy-sensitive technical fields (including rawBody).
+ * Production additionally strips stack traces.
  */
 function filterByEnvironment(data: Record<string, unknown>): Record<string, unknown> {
   if (!isCloudEnv) {
@@ -100,9 +102,10 @@ function filterByEnvironment(data: Record<string, unknown>): Record<string, unkn
 function enrichLogData(data: LogData, moduleName: string): Record<string, unknown> {
   const context = getRequestContext();
 
+  // Spread caller data first, then enforce module so it cannot be spoofed
   let enriched: Record<string, unknown> = {
-    module: moduleName,
     ...data,
+    module: moduleName,
   };
 
   if (context) {
@@ -117,6 +120,7 @@ function enrichLogData(data: LogData, moduleName: string): Record<string, unknow
         user_agent: context.user_agent,
         source_ip: context.source_ip,
       }),
+      module: moduleName,
     };
   }
 
