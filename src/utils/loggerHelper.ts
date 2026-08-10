@@ -20,25 +20,8 @@ const isCloudEnv = ['prod', 'production', 'pre-prod', 'staging', 'dev', 'develop
 
 const isProdEnv = ['prod', 'production'].includes(process.env.NODE_ENV || '');
 
-const isLocalOrTest = ['local', 'test'].includes((process.env.NODE_ENV || '').toLowerCase());
-
-/**
- * Resolve log level. Outside local/test, force info+ (ignore LOG_LEVEL=debug).
- */
-function resolveLogLevel(): string {
-  const requested = String(
-    config.logLevel || process.env.LOG_LEVEL || (isCloudEnv ? 'info' : 'debug')
-  ).toLowerCase();
-
-  if (!isLocalOrTest) {
-    const allowedCloudLevels = ['info', 'warn', 'error'];
-    return allowedCloudLevels.includes(requested) ? requested : 'info';
-  }
-
-  return requested;
-}
-
-const logLevel = resolveLogLevel();
+// Log level is enforced in config.ts (info+ outside local/test)
+const logLevel = String(config.logLevel || (isCloudEnv ? 'info' : 'debug')).toLowerCase();
 
 // Create Winston logger instance
 const winstonLogger: WinstonLogger = createLogger({
@@ -154,6 +137,23 @@ function sanitizeData(data: unknown): unknown {
 
   if (Array.isArray(data)) {
     return data.map(item => sanitizeData(item));
+  }
+
+  // Preserve useful fields from Error (message/stack are non-enumerable)
+  if (data instanceof Error) {
+    return sanitizeData({
+      name: data.name,
+      message: data.message,
+      ...(data.stack ? { stack: data.stack } : {}),
+    });
+  }
+
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
+    return '[Buffer]';
   }
 
   const dataAsRecord = data as Record<string, unknown>;

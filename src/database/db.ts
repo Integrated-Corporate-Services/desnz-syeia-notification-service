@@ -13,11 +13,12 @@ const logger = getLogger(module);
 let pool: Pool | null = null;
 
 /**
- * RDS requires SSL. Disable only for local/dev when PGSSLMODE=disable or NODE_ENV=local.
+ * RDS requires SSL. Disable only for local/dev when SSLMODE=disable or NODE_ENV=local.
+ * PGSSLMODE is still accepted as a fallback so existing deployments are unaffected.
  */
 function buildSslConfig(): false | { rejectUnauthorized: boolean } {
   const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
-  const sslMode = (process.env.PGSSLMODE || '').toLowerCase();
+  const sslMode = (process.env.SSLMODE || process.env.PGSSLMODE || '').toLowerCase();
 
   if (nodeEnv === 'local' || sslMode === 'disable') {
     return false;
@@ -109,13 +110,13 @@ export async function checkDatabaseConnectivity(): Promise<{
 
     return { connected: true, latencyMs };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
     const sanitizedError = createSanitizedErrorLog(error);
     logger.error('[Database] Connectivity check failed', {
       error_message: sanitizedError.sanitized_message,
       error_type: sanitizedError.error_type,
     });
 
-    return { connected: false, error: errorMessage };
+    // Return sanitized message — health endpoints may expose this field
+    return { connected: false, error: sanitizedError.sanitized_message };
   }
 }

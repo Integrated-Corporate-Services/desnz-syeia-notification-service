@@ -9,14 +9,11 @@ export function registerErrorHandler(app: Express): void {
     logger.warn('[HTTP] Route not found', {
       method: req.method,
       path: req.path,
-      url: req.url,
-      originalUrl: req.originalUrl,
     });
     
     res.status(404).json({ 
       error: 'Route not found',
       requestedPath: req.path,
-      requestedUrl: req.url,
       method: req.method,
       availableRoutes: {
         notifyCallback: {
