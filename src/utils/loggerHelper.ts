@@ -22,8 +22,8 @@ const isCloudEnv = ['prod', 'production', 'pre-prod', 'staging', 'dev', 'develop
 
 const isProdEnv = ['prod', 'production'].includes(nodeEnv);
 
-// Log level is enforced in config.ts (info+ outside local/test)
-const logLevel = String(config.logLevel || (isCloudEnv ? 'info' : 'debug')).toLowerCase();
+// Log level comes from LOG_LEVEL via config (NODE_ENV drives env behaviour only)
+const logLevel = String(config.logLevel || 'info').toLowerCase();
 
 // Create Winston logger instance
 const winstonLogger: WinstonLogger = createLogger({

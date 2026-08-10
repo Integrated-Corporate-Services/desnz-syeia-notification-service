@@ -14,11 +14,10 @@ let pool: Pool | null = null;
 
 /**
  * RDS requires SSL. Disable only for local/dev when SSLMODE=disable or NODE_ENV=local.
- * PGSSLMODE is still accepted as a fallback so existing deployments are unaffected.
  */
 function buildSslConfig(): false | { rejectUnauthorized: boolean } {
   const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
-  const sslMode = (process.env.SSLMODE || process.env.PGSSLMODE || '').toLowerCase();
+  const sslMode = (process.env.SSLMODE || '').toLowerCase();
 
   if (nodeEnv === 'local' || sslMode === 'disable') {
     return false;

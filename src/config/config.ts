@@ -90,19 +90,10 @@ const config = {
     endpoint: process.env.AWS_ENDPOINT, // LocalStack
   },
 
-  // Logging
+  // Logging — LOG_LEVEL controls verbosity (debug/info/warn/error);
+  // NODE_ENV is used separately for environment behaviour
   logDir: getEnv('LOG_DIR', './logs'),
-  // Outside local/test, ignore debug — keep info+ only
-  logLevel: (() => {
-    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
-    const isLocalOrTest = nodeEnv === 'local' || nodeEnv === 'test';
-    const requested = getEnv('LOG_LEVEL', isLocalOrTest ? 'debug' : 'info').toLowerCase();
-    if (!isLocalOrTest) {
-      const allowed = ['info', 'warn', 'error'];
-      return allowed.includes(requested) ? requested : 'info';
-    }
-    return requested;
-  })(),
+  logLevel: getEnv('LOG_LEVEL', 'info').toLowerCase(),
 };
 
 export default config;
