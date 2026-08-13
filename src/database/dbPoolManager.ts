@@ -39,7 +39,7 @@ const isLocal = (process.env.NODE_ENV || '').toLowerCase() === 'local';
 class DatabasePoolManager {
   private currentPool: Pool | null = null;
   private currentCredentials: DbCredentials | null = null;
-  private isRefreshing: boolean = false;
+  private isRefreshing = false;
 
   /**
    * Build SSL configuration for AWS RDS
@@ -59,7 +59,10 @@ class DatabasePoolManager {
     if (!this.currentPool) {
       await this.initializePool();
     }
-    return this.currentPool!;
+    if (!this.currentPool) {
+      throw new Error('Failed to initialize database pool');
+    }
+    return this.currentPool;
   }
 
   /**
@@ -115,9 +118,9 @@ class DatabasePoolManager {
    */
   private createPoolConfig(credentials: DbCredentials): PoolConfig {
     return {
-      host: (credentials as any).host || config.database.host,
-      port: Number((credentials as any).port || config.database.port),
-      database: (credentials as any).dbname || config.database.database,
+      host: credentials.host || config.database.host,
+      port: Number(credentials.port || config.database.port),
+      database: credentials.dbname || config.database.database,
       user: credentials.username,
       password: credentials.password,
       max: config.database.max,
@@ -139,7 +142,7 @@ class DatabasePoolManager {
       logger.debug('[DBPoolManager] New connection established');
     });
 
-    this.currentPool.on('error', (err: any) => {
+    this.currentPool.on('error', (err: Error & { code?: string }) => {
       logger.error('[DBPoolManager] Pool error', {
         code: err.code,
         message: err.message,
