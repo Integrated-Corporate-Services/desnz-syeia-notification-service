@@ -37,7 +37,7 @@ export async function handleDeliveryCallback(
   });
 
   try {
-    const pool = getPool();
+    const pool = await getPool();
     
     // Insert into database (idempotent)
     const result = await insertNotifyCallbackEvent(pool, payload, correlationId);

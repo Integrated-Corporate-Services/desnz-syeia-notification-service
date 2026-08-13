@@ -52,7 +52,7 @@ let server: ReturnType<Express['listen']>;
 
 (async () => {
   // Initialize database pool
-  createPool();
+  await createPool();
   
   const app: Express = await createApp();
 
