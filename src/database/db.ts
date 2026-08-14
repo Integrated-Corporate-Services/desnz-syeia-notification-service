@@ -1,95 +1,36 @@
 /**
- * Database Connection Management
- * PostgreSQL connection pool
+ * Database Connection Management with Automatic Password Rotation
+ * Uses DatabasePoolManager for connection pool with credential refresh capability
  */
 
 import { Pool } from 'pg';
-import config from '../config/config';
+import poolManager from './dbPoolManager';
 import getLogger from '../utils/loggerHelper';
 
 const logger = getLogger(module);
 
-let pool: Pool | null = null;
-
-/**
- * RDS requires SSL. Disable only for local/dev when PGSSLMODE=disable or NODE_ENV=local.
- */
-function buildSslConfig(): false | { rejectUnauthorized: boolean } {
-  const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
-  const sslMode = (process.env.PGSSLMODE || '').toLowerCase();
-
-  if (nodeEnv === 'local' || sslMode === 'disable') {
-    return false;
-  }
-
-  return { rejectUnauthorized: false };
-}
-
 /**
  * Create PostgreSQL connection pool
+ * Now delegates to the DatabasePoolManager which handles credential rotation
  */
-export function createPool(): Pool {
-  if (pool) {
-    return pool;
-  }
-
-  const ssl = buildSslConfig();
-
-  logger.info('[Database] Creating connection pool', {
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.database,
-    max: config.database.max,
-    ssl: Boolean(ssl),
-  });
-
-  pool = new Pool({
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.database,
-    user: config.database.user,
-    password: config.database.password,
-    max: config.database.max,
-    idleTimeoutMillis: config.database.idleTimeoutMillis,
-    connectionTimeoutMillis: config.database.connectionTimeoutMillis,
-    ssl,
-  });
-
-  // Connection event handlers
-  pool.on('connect', () => {
-    logger.debug('[Database] Pool connection established');
-  });
-
-  pool.on('error', (err) => {
-    logger.error('[Database] Pool error', {
-      error: err.message,
-      stack: err.stack,
-    });
-  });
-
-  return pool;
+export async function createPool(): Promise<Pool> {
+  logger.info('[Database] Initializing connection pool via DatabasePoolManager');
+  return await poolManager.getPool();
 }
 
 /**
  * Get existing pool instance
  */
-export function getPool(): Pool {
-  if (!pool) {
-    throw new Error('Database pool not initialized. Call createPool() first.');
-  }
-  return pool;
+export async function getPool(): Promise<Pool> {
+  return await poolManager.getPool();
 }
 
 /**
  * Close database pool (graceful shutdown)
  */
 export async function closePool(): Promise<void> {
-  if (pool) {
-    logger.info('[Database] Closing connection pool');
-    await pool.end();
-    pool = null;
-    logger.info('[Database] Connection pool closed');
-  }
+  logger.info('[Database] Closing connection pool');
+  await poolManager.closePool();
 }
 
 /**
@@ -102,7 +43,7 @@ export async function checkDatabaseConnectivity(): Promise<{
 }> {
   try {
     const start = Date.now();
-    const currentPool = getPool();
+    const currentPool = await getPool();
     await currentPool.query('SELECT 1');
     const latencyMs = Date.now() - start;
 

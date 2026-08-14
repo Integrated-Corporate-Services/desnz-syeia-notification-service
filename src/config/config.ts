@@ -26,35 +26,46 @@ function getEnv(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
+/**
+ * Get database credentials (supports ARN, JSON, or individual env vars)
+ * Note: This function is used by dbPoolManager which handles ARN resolution.
+ * For direct config access, use individual DB_USER/DB_PASSWORD env vars.
+ */
 function getDbCredentials() {
-  const dbCredentials = process.env.DB_CREDENTIALS;
+  // If using individual env vars (local development)
+  const dbUser = process.env.DB_USER;
+  const dbPassword = process.env.DB_PASSWORD;
   
-  if (!dbCredentials) {
-    throw new Error(
-      'Missing required environment variable: DB_CREDENTIALS'
-    );
-  }
-
-  try {
-    const creds = JSON.parse(dbCredentials);
-    if (!creds.username || !creds.password) {
-      throw new Error(
-        'DB_CREDENTIALS secret must contain both "username" and "password" fields. '
-      );
-    }
-
+  if (dbUser && dbPassword) {
     return {
-      user: creds.username,
-      password: creds.password,
+      user: dbUser,
+      password: dbPassword,
     };
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(
-        'DB_CREDENTIALS is not valid JSON. '
-      );
-    }
-    throw error;
   }
+
+  // If DB_CREDENTIALS is provided but not an ARN, try parsing as JSON
+  const dbCredentials = process.env.DB_CREDENTIALS;
+  if (dbCredentials && !dbCredentials.startsWith('arn:')) {
+    try {
+      const creds = JSON.parse(dbCredentials);
+      if (creds.username && creds.password) {
+        return {
+          user: creds.username,
+          password: creds.password,
+        };
+      }
+    } catch (error) {
+      // If JSON parsing fails, fall through to empty credentials
+      // dbPoolManager will handle ARN resolution
+    }
+  }
+
+  // Return empty credentials - dbPoolManager will handle ARN resolution
+  // or fail with appropriate error message
+  return {
+    user: process.env.DB_USER || '',
+    password: process.env.DB_PASSWORD || '',
+  };
 }
 
 /**
