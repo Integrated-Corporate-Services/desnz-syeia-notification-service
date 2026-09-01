@@ -90,7 +90,7 @@ const config = {
 
   // Notify Configuration
   notify: {
-    bearerToken: process.env.NOTIFY_CALLBACK_BEARER_TOKEN,
+    bearerToken: process.env.NOTIFY_CALLBACK_BEARER_TOKEN || process.env.NOTIFY_CALLBACK_SECRET_NAME,
   },
 
   // AWS Configuration

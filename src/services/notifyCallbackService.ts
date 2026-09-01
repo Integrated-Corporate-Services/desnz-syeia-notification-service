@@ -21,7 +21,7 @@ export function getNotifyCallbackToken(): string {
   const token = config.notify.bearerToken?.trim();
 
   if (!token) {
-    throw new Error('No bearer token configured (NOTIFY_CALLBACK_BEARER_TOKEN is not set)');
+    throw new Error('No bearer token configured (NOTIFY_CALLBACK_SECRET_NAME is not set)');
   }
 
   if (token.length < MIN_TOKEN_LENGTH) {
