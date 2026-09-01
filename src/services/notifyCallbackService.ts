@@ -3,7 +3,6 @@
  * Bearer token authentication and token management
  */
 
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import crypto from 'crypto';
 import config from '../config/config';
 import getLogger from '../utils/loggerHelper';
@@ -12,88 +11,26 @@ import { MIN_TOKEN_LENGTH, ERROR_CODES, RESPONSE_MESSAGES } from '../constants/n
 
 const logger = getLogger(module);
 
-// Token cache interface
-interface TokenCache {
-  token: string;
-  expiresAt: number;
-}
+let validatedToken: string | null = null;
 
-let tokenCache: TokenCache | null = null;
-let secretsManagerClient: SecretsManagerClient | null = null;
-
-/**
- * Get Secrets Manager client (singleton)
- */
-function getSecretsManagerClient(): SecretsManagerClient {
-  if (!secretsManagerClient) {
-    secretsManagerClient = new SecretsManagerClient({
-      region: config.aws.region,
-      endpoint: config.aws.endpoint,
-    });
-  }
-  return secretsManagerClient;
-}
-
-/**
- * Get notify callback bearer token from AWS Secrets Manager (with 5-min cache)
- */
-export async function getNotifyCallbackToken(): Promise<string> {
-  // Check cache first
-  if (tokenCache && Date.now() < tokenCache.expiresAt) {
-    logger.debug('[NotifyService] Using cached bearer token');
-    return tokenCache.token;
+export function getNotifyCallbackToken(): string {
+  if (validatedToken) {
+    return validatedToken;
   }
 
-  // Try Secrets Manager first
-  if (config.notify.secretName) {
-    try {
-      logger.debug('[NotifyService] Fetching bearer token from Secrets Manager', {
-        secretName: config.notify.secretName,
-      });
+  const token = config.notify.bearerToken?.trim();
 
-      const command = new GetSecretValueCommand({
-        SecretId: config.notify.secretName,
-      });
-
-      const response = await getSecretsManagerClient().send(command);
-      const token = response.SecretString?.trim();
-
-      if (!token || token.length < MIN_TOKEN_LENGTH) {
-        throw new Error(`Token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
-      }
-
-      // Cache for 5 minutes
-      tokenCache = {
-        token,
-        expiresAt: Date.now() + config.notify.secretTtlMs,
-      };
-
-      logger.info('[NotifyService] Bearer token loaded from Secrets Manager');
-      return token;
-    } catch (error) {
-      logger.error('[NotifyService] Failed to fetch from Secrets Manager', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      // In production, fail hard
-      if (config.nodeEnv === 'production') {
-        throw new Error('Cannot retrieve Notify callback token from Secrets Manager in production');
-      }
-    }
+  if (!token) {
+    throw new Error('No bearer token configured');
   }
 
-  // Development fallback: environment variable
-  if (config.notify.fallbackToken) {
-    logger.warn('[NotifyService] Using fallback bearer token from environment (DEVELOPMENT ONLY)');
-
-    if (config.notify.fallbackToken.length < MIN_TOKEN_LENGTH) {
-      throw new Error(`Fallback token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
-    }
-
-    return config.notify.fallbackToken;
+  if (token.length < MIN_TOKEN_LENGTH) {
+    throw new Error(`Bearer token too short (minimum ${MIN_TOKEN_LENGTH} characters)`);
   }
 
-  throw new Error('No bearer token configured (neither Secrets Manager nor fallback)');
+  validatedToken = token;
+  logger.info('[NotifyService] Bearer token loaded from environment');
+  return validatedToken;
 }
 
 /**
@@ -124,7 +61,7 @@ export async function verifyNotifyBearerToken(authHeader: string | undefined): P
   // Get expected token
   let expectedToken: string;
   try {
-    expectedToken = await getNotifyCallbackToken();
+    expectedToken = getNotifyCallbackToken();
   } catch (error) {
     logger.error('[NotifyService] Failed to get expected token', {
       error: error instanceof Error ? error.message : String(error),
