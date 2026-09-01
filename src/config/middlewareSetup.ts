@@ -10,7 +10,9 @@ interface RequestWithRawBody extends Request {
 }
 
 export function registerMiddleware(app: Express): void {
-  app.set('trust proxy', true);
+
+  app.set('trust proxy', 1);
+
 
   app.use(requestContextMiddleware);
   app.use(securityHeadersMiddleware);
