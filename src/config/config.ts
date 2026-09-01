@@ -90,15 +90,13 @@ const config = {
 
   // Notify Configuration
   notify: {
-    secretName: getEnv('NOTIFY_CALLBACK_SECRET_NAME', 'notify/callback-bearer-token'),
-    secretTtlMs: parseInt(getEnv('NOTIFY_SECRET_TTL_MS', '300000'), 10), // 5 minutes
-    fallbackToken: process.env.NOTIFY_CALLBACK_BEARER_TOKEN, // Development fallback only
+    bearerToken: process.env.NOTIFY_CALLBACK_BEARER_TOKEN,
   },
 
   // AWS Configuration
   aws: {
     region: getEnv('AWS_REGION', 'eu-west-2'),
-    endpoint: process.env.AWS_ENDPOINT, // LocalStack
+    endpoint: process.env.AWS_ENDPOINT,
   },
 
   // Logging
